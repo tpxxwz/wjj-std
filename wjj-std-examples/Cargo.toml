@@ -1,0 +1,17 @@
+[package]
+name = "wjj-std-examples"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "Examples for wjj-std"
+publish = false
+
+[dev-dependencies]
+wjj-std = { path = "../wjj-std", features = ["full"] }
+tokio = { workspace = true, features = ["full"] }
+async-trait = "0.1"
+serde_json.workspace = true
+linkme.workspace = true
