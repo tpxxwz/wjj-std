@@ -3,13 +3,12 @@
 //! Provides a component-based application framework with lifecycle management.
 
 use tokio::signal;
-use tokio::task::JoinHandle;
 
 /// Component trait - defines the interface for application components
 #[async_trait::async_trait]
 pub trait Component {
-    /// Startup the component, returning background task handle if any
-    async fn startup(&mut self) -> Option<JoinHandle<()>>;
+    /// Startup the component
+    async fn startup(&mut self);
 
     /// Graceful shutdown (call framework-specific graceful shutdown API)
     fn graceful_shutdown(&mut self) {}
@@ -18,7 +17,6 @@ pub trait Component {
 /// Component registry - manages component lifecycle
 pub struct Registry {
     components: Vec<Box<dyn Component>>,
-    join_handles: Vec<JoinHandle<()>>,
 }
 
 impl Registry {
@@ -26,7 +24,6 @@ impl Registry {
     pub fn new() -> Self {
         Self {
             components: Vec::new(),
-            join_handles: Vec::new(),
         }
     }
 
@@ -38,14 +35,12 @@ impl Registry {
     /// Startup all components in registration order
     pub async fn startup_all(&mut self) {
         for c in &mut self.components {
-            if let Some(handle) = c.startup().await {
-                self.join_handles.push(handle);
-            }
+            c.startup().await;
         }
     }
 
-    /// Wait for all async components or shutdown signal
-    pub async fn wait_all(&mut self) {
+    /// Wait for shutdown signal
+    pub async fn wait_for_shutdown(&mut self) {
         // Wait for shutdown signal
         #[cfg(unix)]
         {
@@ -64,11 +59,6 @@ impl Registry {
         // Trigger graceful shutdown
         println!("Starting graceful shutdown...");
         self.shutdown_all();
-
-        // Wait for all component tasks to complete
-        for handle in self.join_handles.drain(..) {
-            let _ = handle.await;
-        }
     }
 
     /// Shutdown all components in reverse registration order

@@ -39,4 +39,4 @@ serde_json = { workspace = true, optional = true }
 
 # Optional dependencies for app feature
 tokio = { workspace = true, optional = true }
-async-trait = { version = "0.1", optional = true }
+async-trait = { workspace = true, optional = true }

@@ -5,8 +5,7 @@
 //! cargo run --example app_framework --features app
 //! ```
 
-use wjj_std::{Registry, Component};
-use async_trait::async_trait;
+use wjj_std::{Registry, Component, async_trait};
 use tokio::task::JoinHandle;
 
 // ========== Generic Configuration Trait ==========
@@ -42,6 +41,7 @@ impl AppConfig for MyConfig {
 
 pub struct DatabaseComponent {
     db_url: String,
+    _task_handle: Option<JoinHandle<()>>,
 }
 
 impl DatabaseComponent {
@@ -51,28 +51,34 @@ impl DatabaseComponent {
     {
         Self {
             db_url: config.db_url().to_string(),
+            _task_handle: None,
         }
     }
 }
 
 #[async_trait]
 impl Component for DatabaseComponent {
-    async fn startup(&mut self) -> Option<JoinHandle<()>> {
+    async fn startup(&mut self) {
         println!("Database connecting to: {}", self.db_url);
         // Simulate database connection
-        Some(tokio::spawn(async {
+        let handle = tokio::spawn(async {
             println!("Database task running");
             tokio::time::sleep(tokio::time::Duration::from_secs(100)).await;
-        }))
+        });
+        self._task_handle = Some(handle);
     }
 
     fn graceful_shutdown(&mut self) {
         println!("Database disconnecting");
+        if let Some(handle) = self._task_handle.take() {
+            handle.abort();
+        }
     }
 }
 
 pub struct HttpServerComponent {
     port: u16,
+    _task_handle: Option<JoinHandle<()>>,
 }
 
 impl HttpServerComponent {
@@ -82,18 +88,20 @@ impl HttpServerComponent {
     {
         Self {
             port: config.http_port(),
+            _task_handle: None,
         }
     }
 }
 
 #[async_trait]
 impl Component for HttpServerComponent {
-    async fn startup(&mut self) -> Option<JoinHandle<()>> {
+    async fn startup(&mut self) {
         println!("HTTP server listening on port {}", self.port);
-        Some(tokio::spawn(async {
+        let handle = tokio::spawn(async {
             println!("HTTP server task running");
             tokio::time::sleep(tokio::time::Duration::from_secs(100)).await;
-        }))
+        });
+        self._task_handle = Some(handle);
     }
 
     fn graceful_shutdown(&mut self) {
@@ -138,7 +146,7 @@ async fn main() {
     println!("\nAll components started. Press Ctrl+C to shutdown...\n");
 
     // Wait for shutdown signal
-    registry.wait_all().await;
+    registry.wait_for_shutdown().await;
 
     println!("\nShutdown complete!");
 }
