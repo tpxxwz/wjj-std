@@ -5,8 +5,9 @@
 //! cargo run --example app_framework --features app
 //! ```
 
-use wjj_std::{Registry, Component, async_trait};
-use tokio::sync::oneshot;
+use tokio::time::{Duration, interval};
+use wjj_std::{Component, Registry, async_trait};
+use wjj_std::anyhow::Result;
 
 // ========== Generic Configuration Trait ==========
 
@@ -56,20 +57,20 @@ impl DatabaseComponent {
 
 #[async_trait]
 impl Component for DatabaseComponent {
-    async fn startup(&mut self) {
-        println!("Database connecting to: {}", self.db_url);
+    async fn startup(
+        &mut self,
+        _shutdown_rx: tokio::sync::broadcast::Receiver<()>,
+    ) -> Result<Option<tokio::task::JoinHandle<()>>, wjj_std::Error> {
+        log::info!("📦 Database connecting to: {}", self.db_url);
         // Simulate database connection (synchronous, no background task needed)
-        println!("Database connected");
-    }
-
-    fn graceful_shutdown(&mut self) {
-        println!("Database disconnecting");
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        log::info!("✅ Database connected");
+        Ok(None) // No background task for this component
     }
 }
 
 pub struct HttpServerComponent {
     port: u16,
-    shutdown_tx: Option<oneshot::Sender<()>>,
 }
 
 impl HttpServerComponent {
@@ -79,35 +80,74 @@ impl HttpServerComponent {
     {
         Self {
             port: config.http_port(),
-            shutdown_tx: None,
         }
     }
 }
 
 #[async_trait]
 impl Component for HttpServerComponent {
-    async fn startup(&mut self) {
+    async fn startup(
+        &mut self,
+        mut shutdown_rx: tokio::sync::broadcast::Receiver<()>,
+    ) -> Result<Option<tokio::task::JoinHandle<()>>, wjj_std::Error> {
         let port = self.port;
-        let (shutdown_tx, shutdown_rx) = oneshot::channel();
-        self.shutdown_tx = Some(shutdown_tx);
 
-        println!("HTTP server listening on port {}", port);
+        log::info!("🌐 HTTP server listening on port {}", port);
 
         // Spawn background task with graceful shutdown support
-        tokio::spawn(async move {
-            println!("HTTP server task running");
-            // Wait for shutdown signal
-            shutdown_rx.await.ok();
-            println!("HTTP server task stopped");
-        });
-    }
+        Ok(Some(tokio::spawn(async move {
+            log::info!("✅ HTTP server task running");
 
-    fn graceful_shutdown(&mut self) {
-        println!("HTTP server shutting down");
-        // Send shutdown signal to background task
-        if let Some(tx) = self.shutdown_tx.take() {
-            let _ = tx.send(());
-        }
+            let mut ticker = interval(Duration::from_secs(2));
+            let mut request_count = 0;
+
+            // Server loop - monitor both shutdown signal and work
+            loop {
+                tokio::select! {
+                    // Check for shutdown signal
+                    _ = shutdown_rx.recv() => {
+                        log::info!("⏳ HTTP server received shutdown signal");
+                        log::info!("🔄 Cleaning up... (processed {} requests)", request_count);
+                        break;
+                    }
+                    // Simulate handling requests
+                    _ = ticker.tick() => {
+                        request_count += 1;
+                        log::info!("📨 Processing request #{} on port {}", request_count, port);
+                    }
+                }
+            }
+
+            log::info!("🛑 HTTP server task stopped gracefully");
+        }))
+    }
+}
+
+pub struct HealthCheckComponent;
+
+#[async_trait]
+impl Component for HealthCheckComponent {
+    async fn startup(
+        &mut self,
+        mut shutdown_rx: tokio::sync::broadcast::Receiver<()>,
+    ) -> Result<Option<tokio::task::JoinHandle<()>>, wjj_std::Error> {
+        log::info!("💚 Health check service starting");
+
+        Ok(Some(tokio::spawn(async move {
+            let mut ticker = interval(Duration::from_secs(5));
+
+            loop {
+                tokio::select! {
+                    _ = shutdown_rx.recv() => {
+                        log::info!("💚 Health check service shutting down");
+                        break;
+                    }
+                    _ = ticker.tick() => {
+                        log::info!("💚 All systems operational");
+                    }
+                }
+            }
+        }))
     }
 }
 
@@ -123,6 +163,7 @@ where
     // Register components using generic config
     registry.register(Box::new(DatabaseComponent::new(&config)));
     registry.register(Box::new(HttpServerComponent::new(&config)));
+    registry.register(Box::new(HealthCheckComponent));
 
     registry
 }
@@ -131,7 +172,12 @@ where
 
 #[tokio::main]
 async fn main() {
-    println!("=== WJJ-STD Application Framework Example ===\n");
+    // Initialize logger for example
+    env_logger::init();
+
+    println!("╔════════════════════════════════════════════╗");
+    println!("║  WJJ-STD Application Framework Example     ║");
+    println!("╚════════════════════════════════════════════╝\n");
 
     // Create configuration
     let config = MyConfig {
@@ -143,12 +189,17 @@ async fn main() {
     let mut registry = register_all(config);
 
     // Startup all components
-    registry.startup_all().await;
+    if let Err(e) = registry.startup_all().await {
+        eprintln!("Failed to start components: {}", e);
+        std::process::exit(1);
+    }
 
-    println!("\nAll components started. Press Ctrl+C to shutdown...\n");
+    println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    println!("  All components started. Press Ctrl+C to shutdown");
+    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
     // Wait for shutdown signal
     registry.wait_for_shutdown().await;
 
-    println!("\nShutdown complete!");
+    println!("\n✅ Shutdown complete! Goodbye!");
 }

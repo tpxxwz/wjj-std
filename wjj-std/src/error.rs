@@ -1,12 +1,8 @@
 //! Error handling module
 
 pub use wjj_std_core::{
-    ErrCodeRegistration,
-    ERR_CODE_REGISTRATIONS,
-    FmtErr,
-    RawErr,
+    ERR_CODE_REGISTRATIONS, ErrCodeRegistration, FmtErr, RawErr, TEMPLATE_REGISTRATIONS,
     TemplateRegistration,
-    TEMPLATE_REGISTRATIONS,
 };
 
 pub use wjj_std_macros::{fmt_err, raw_err};

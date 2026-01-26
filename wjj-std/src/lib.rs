@@ -93,10 +93,7 @@ pub use error::*;
 
 // ========== Application Framework ==========
 #[cfg(feature = "app")]
-mod app;
-
-#[cfg(feature = "app")]
-pub use app::*;
+pub use wjj_std_core::app::*;
 
 // ========== Future Modules (Placeholder) ==========
 

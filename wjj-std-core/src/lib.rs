@@ -2,7 +2,7 @@
 mod err;
 
 #[cfg(feature = "app")]
-mod app;
+pub mod app;
 
 #[cfg(feature = "error")]
 pub use err::{

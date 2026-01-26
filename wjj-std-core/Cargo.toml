@@ -18,7 +18,7 @@ default = []
 error = ["dep:linkme", "dep:ctor", "dep:minijinja", "dep:once_cell", "dep:serde_json"]
 
 # Application framework module
-app = ["dep:tokio", "dep:async-trait"]
+app = ["dep:tokio", "dep:async-trait", "dep:log"]
 
 # Future modules (placeholder)
 string = []
@@ -40,3 +40,7 @@ serde_json = { workspace = true, optional = true }
 # Optional dependencies for app feature
 tokio = { workspace = true, optional = true }
 async-trait = { workspace = true, optional = true }
+
+# Always available (needed for public API)
+anyhow = { workspace = true }
+log = { workspace = true, optional = true }

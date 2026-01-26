@@ -14,3 +14,5 @@ wjj-std = { path = "../wjj-std", features = ["full"] }
 tokio = { workspace = true, features = ["full"] }
 serde_json.workspace = true
 linkme.workspace = true
+env_logger = "0.11.8"
+log = "0.4.29"
