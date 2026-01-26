@@ -93,93 +93,10 @@ pub use error::*;
 
 // ========== Application Framework ==========
 #[cfg(feature = "app")]
-pub use async_trait::async_trait;
-
-
-/// Component trait - defines the interface for application components
-#[cfg(feature = "app")]
-#[async_trait::async_trait]
-pub trait Component {
-    /// Startup the component
-    async fn startup(&mut self);
-
-    /// Graceful shutdown (call framework-specific graceful shutdown API)
-    fn graceful_shutdown(&mut self) {}
-}
-
-/// Component registry - manages component lifecycle
-#[cfg(feature = "app")]
-pub struct Registry {
-    components: Vec<Box<dyn Component>>,
-}
+mod app;
 
 #[cfg(feature = "app")]
-impl Registry {
-    /// Create a new registry
-    pub fn new() -> Self {
-        Self {
-            components: Vec::new(),
-        }
-    }
-
-    /// Register a component
-    pub fn register(&mut self, component: Box<dyn Component>) {
-        self.components.push(component);
-    }
-
-    /// Startup all components in registration order
-    pub async fn startup_all(&mut self) {
-        for c in &mut self.components {
-            c.startup().await;
-        }
-    }
-
-    /// Wait for shutdown signal
-    pub async fn wait_for_shutdown(&mut self) {
-        // Wait for shutdown signal
-        #[cfg(unix)]
-        {
-            tokio::select! {
-                _ = tokio::signal::ctrl_c() => println!("Received Ctrl+C"),
-                _ = unix_signal_shutdown() => println!("Received SIGTERM"),
-            }
-        }
-
-        #[cfg(not(unix))]
-        {
-            tokio::signal::ctrl_c().await;
-            println!("Received Ctrl+C");
-        }
-
-        // Trigger graceful shutdown
-        println!("Starting graceful shutdown...");
-        self.shutdown_all();
-    }
-
-    /// Shutdown all components in reverse registration order
-    pub fn shutdown_all(&mut self) {
-        // Shutdown in reverse order (last registered, first shutdown)
-        for c in self.components.iter_mut().rev() {
-            c.graceful_shutdown();
-        }
-    }
-}
-
-#[cfg(feature = "app")]
-impl Default for Registry {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-/// Listen for SIGTERM signal (Unix/Linux/macOS only)
-#[cfg(all(unix, feature = "app"))]
-async fn unix_signal_shutdown() {
-    tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
-        .expect("Failed to install SIGTERM handler")
-        .recv()
-        .await;
-}
+pub use app::*;
 
 // ========== Future Modules (Placeholder) ==========
 

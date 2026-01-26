@@ -6,7 +6,7 @@
 //! ```
 
 use wjj_std::{Registry, Component, async_trait};
-use tokio::task::JoinHandle;
+use tokio::sync::oneshot;
 
 // ========== Generic Configuration Trait ==========
 
@@ -41,7 +41,6 @@ impl AppConfig for MyConfig {
 
 pub struct DatabaseComponent {
     db_url: String,
-    _task_handle: Option<JoinHandle<()>>,
 }
 
 impl DatabaseComponent {
@@ -51,7 +50,6 @@ impl DatabaseComponent {
     {
         Self {
             db_url: config.db_url().to_string(),
-            _task_handle: None,
         }
     }
 }
@@ -60,25 +58,18 @@ impl DatabaseComponent {
 impl Component for DatabaseComponent {
     async fn startup(&mut self) {
         println!("Database connecting to: {}", self.db_url);
-        // Simulate database connection
-        let handle = tokio::spawn(async {
-            println!("Database task running");
-            tokio::time::sleep(tokio::time::Duration::from_secs(100)).await;
-        });
-        self._task_handle = Some(handle);
+        // Simulate database connection (synchronous, no background task needed)
+        println!("Database connected");
     }
 
     fn graceful_shutdown(&mut self) {
         println!("Database disconnecting");
-        if let Some(handle) = self._task_handle.take() {
-            handle.abort();
-        }
     }
 }
 
 pub struct HttpServerComponent {
     port: u16,
-    _task_handle: Option<JoinHandle<()>>,
+    shutdown_tx: Option<oneshot::Sender<()>>,
 }
 
 impl HttpServerComponent {
@@ -88,7 +79,7 @@ impl HttpServerComponent {
     {
         Self {
             port: config.http_port(),
-            _task_handle: None,
+            shutdown_tx: None,
         }
     }
 }
@@ -96,16 +87,27 @@ impl HttpServerComponent {
 #[async_trait]
 impl Component for HttpServerComponent {
     async fn startup(&mut self) {
-        println!("HTTP server listening on port {}", self.port);
-        let handle = tokio::spawn(async {
+        let port = self.port;
+        let (shutdown_tx, shutdown_rx) = oneshot::channel();
+        self.shutdown_tx = Some(shutdown_tx);
+
+        println!("HTTP server listening on port {}", port);
+
+        // Spawn background task with graceful shutdown support
+        tokio::spawn(async move {
             println!("HTTP server task running");
-            tokio::time::sleep(tokio::time::Duration::from_secs(100)).await;
+            // Wait for shutdown signal
+            shutdown_rx.await.ok();
+            println!("HTTP server task stopped");
         });
-        self._task_handle = Some(handle);
     }
 
     fn graceful_shutdown(&mut self) {
         println!("HTTP server shutting down");
+        // Send shutdown signal to background task
+        if let Some(tx) = self.shutdown_tx.take() {
+            let _ = tx.send(());
+        }
     }
 }
 
