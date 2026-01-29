@@ -7,7 +7,6 @@
 
 use tokio::time::{Duration, interval};
 use wjj_std::{Component, Registry, async_trait};
-use wjj_std::anyhow::Result;
 
 // ========== Generic Configuration Trait ==========
 
@@ -119,7 +118,7 @@ impl Component for HttpServerComponent {
             }
 
             log::info!("🛑 HTTP server task stopped gracefully");
-        }))
+        })))
     }
 }
 
@@ -147,7 +146,7 @@ impl Component for HealthCheckComponent {
                     }
                 }
             }
-        }))
+        })))
     }
 }
 

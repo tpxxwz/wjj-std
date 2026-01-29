@@ -99,7 +99,7 @@ impl Registry {
 
     /// Shutdown all components by broadcasting shutdown signal
     /// Then wait for all background tasks to complete (in reverse order)
-    pub async fn shutdown_all(&mut self) {
+    async fn shutdown_all(&mut self) {
         // Send shutdown signal to all components
         let _ = self.shutdown_tx.send(());
 
