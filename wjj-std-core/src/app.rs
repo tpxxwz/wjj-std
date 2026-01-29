@@ -33,17 +33,16 @@ pub trait Component: Send {
 
 /// Component registry - manages component lifecycle
 ///
-/// The lifetime parameter 'a represents the lifetime of the configuration reference.
-/// Components may hold references to the configuration, and the configuration
-/// must outlive the registry.
-pub struct Registry<'a, C> {
-    config: &'a C,
+/// The lifetime parameter 'a represents the lifetime of component references.
+/// Components may hold references to external data (e.g., configuration),
+/// and those references must outlive the registry.
+pub struct Registry<'a> {
     components: Vec<Box<dyn Component + 'a>>,
     handles: Vec<JoinHandle<()>>,
     shutdown_tx: broadcast::Sender<()>,
 }
 
-impl<'a, C> Registry<'a, C> {
+impl<'a> Registry<'a> {
     /// Create a new registry with configuration and register components
     ///
     /// The registration function receives:
@@ -62,7 +61,7 @@ impl<'a, C> Registry<'a, C> {
     /// .run()
     /// .await;
     /// ```
-    pub fn new<F>(config: &'a C, register_fn: F) -> Self
+    pub fn new<C, F>(config: &'a C, register_fn: F) -> Self
     where
         F: FnOnce(&'a C, &mut Vec<Box<dyn Component + 'a>>),
     {
@@ -72,7 +71,6 @@ impl<'a, C> Registry<'a, C> {
         register_fn(config, &mut components);
 
         Self {
-            config,
             components,
             handles: Vec::new(),
             shutdown_tx,

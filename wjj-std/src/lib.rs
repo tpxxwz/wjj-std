@@ -84,37 +84,38 @@
 // 为了让宏生成的代码能找到 ::wjj_std:: 路径
 extern crate self as wjj_std;
 
-// ========== Error Handling ==========
+// ========== Feature: error ==========
 #[cfg(feature = "error")]
 mod error;
-
 #[cfg(feature = "error")]
 pub use error::*;
 
-// ========== Application Framework ==========
+// ========== Feature: app ==========
 #[cfg(feature = "app")]
 pub use wjj_std_core::app::*;
 
-// ========== Future Modules (Placeholder) ==========
-
+// ========== Feature: string ==========
 #[cfg(feature = "string")]
 /// String utilities module (coming soon)
 pub mod string {
     //! String manipulation utilities
 }
 
+// ========== Feature: http ==========
 #[cfg(feature = "http")]
 /// HTTP utilities module (coming soon)
 pub mod http {
     //! HTTP client and server utilities
 }
 
+// ========== Feature: json ==========
 #[cfg(feature = "json")]
 /// JSON utilities module (coming soon)
 pub mod json {
     //! JSON processing utilities
 }
 
+// ========== Feature: time ==========
 #[cfg(feature = "time")]
 /// Time utilities module (coming soon)
 pub mod time {
