@@ -1,5 +1,13 @@
 //! Application framework example
 //!
+//! This example demonstrates how to use the wjj-std application framework
+//! with generic configuration and component registration.
+//!
+//! ## Key Features
+//! - Generic configuration support
+//! - Flexible component registration via function callback
+//! - Graceful shutdown handling
+//!
 //! Run with:
 //! ```bash
 //! cargo run --example app_framework --features app
@@ -39,23 +47,23 @@ impl AppConfig for MyConfig {
 
 // ========== Example Components ==========
 
-pub struct DatabaseComponent {
-    db_url: String,
+pub struct DatabaseComponent<'a> {
+    db_url: &'a str,
 }
 
-impl DatabaseComponent {
-    pub fn new<C>(config: &C) -> Self
+impl<'a> DatabaseComponent<'a> {
+    pub fn new<C>(config: &'a C) -> Self
     where
         C: AppConfig,
     {
         Self {
-            db_url: config.db_url().to_string(),
+            db_url: config.db_url(),
         }
     }
 }
 
 #[async_trait]
-impl Component for DatabaseComponent {
+impl Component for DatabaseComponent<'_> {
     async fn startup(
         &mut self,
         _shutdown_rx: tokio::sync::broadcast::Receiver<()>,
@@ -150,21 +158,19 @@ impl Component for HealthCheckComponent {
     }
 }
 
-// ========== Generic Register Function ==========
+// ========== Component Registration Function ==========
 
-/// Generic function to register all components
-pub fn register_all<C>(config: C) -> Registry
+/// Register all application components
+///
+/// This function is called by the framework with the config and components vector.
+/// Users implement this to define which components to instantiate.
+pub fn register_components<'a, C>(config: &'a C, components: &mut Vec<Box<dyn Component + 'a>>)
 where
     C: AppConfig,
 {
-    let mut registry = Registry::new();
-
-    // Register components using generic config
-    registry.register(Box::new(DatabaseComponent::new(&config)));
-    registry.register(Box::new(HttpServerComponent::new(&config)));
-    registry.register(Box::new(HealthCheckComponent));
-
-    registry
+    components.push(Box::new(DatabaseComponent::new(config)));
+    components.push(Box::new(HttpServerComponent::new(config)));
+    components.push(Box::new(HealthCheckComponent));
 }
 
 // ========== Main ==========
@@ -184,21 +190,22 @@ async fn main() {
         http_port: 8080,
     };
 
-    // Register all components (generic!)
-    let mut registry = register_all(config);
-
-    // Startup all components
-    if let Err(e) = registry.startup_all().await {
-        eprintln!("Failed to start components: {}", e);
-        std::process::exit(1);
-    }
-
     println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    println!("  All components started. Press Ctrl+C to shutdown");
+    println!("  Starting application...");
+    println!("  Press Ctrl+C to shutdown");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
-    // Wait for shutdown signal
-    registry.wait_for_shutdown().await;
+    // Method 1: Use a named function (Recommended)
+    Registry::new(&config, register_components).run().await;
+
+    // Method 2: Use a closure (Alternative)
+    // Registry::new(&config, |config, components| {
+    //     components.push(Box::new(DatabaseComponent::new(config)));
+    //     components.push(Box::new(HttpServerComponent::new(config)));
+    //     components.push(Box::new(HealthCheckComponent));
+    // })
+    // .run()
+    // .await;
 
     println!("\n✅ Shutdown complete! Goodbye!");
 }

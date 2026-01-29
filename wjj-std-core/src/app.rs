@@ -10,6 +10,9 @@ use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
 
 /// Component trait - defines the interface for application components
+///
+/// The lifetime parameter 'a represents the lifetime of the configuration
+/// that components may hold references to.
 #[async_trait::async_trait]
 pub trait Component: Send {
     /// Startup the component
@@ -29,36 +32,72 @@ pub trait Component: Send {
 }
 
 /// Component registry - manages component lifecycle
-pub struct Registry {
-    components: Vec<Box<dyn Component>>,
+///
+/// The lifetime parameter 'a represents the lifetime of the configuration reference.
+/// Components may hold references to the configuration, and the configuration
+/// must outlive the registry.
+pub struct Registry<'a, C> {
+    config: &'a C,
+    components: Vec<Box<dyn Component + 'a>>,
     handles: Vec<JoinHandle<()>>,
     shutdown_tx: broadcast::Sender<()>,
 }
 
-impl Registry {
-    /// Create a new registry
-    pub fn new() -> Self {
+impl<'a, C> Registry<'a, C> {
+    /// Create a new registry with configuration and register components
+    ///
+    /// The registration function receives:
+    /// - `config`: Reference to the configuration
+    /// - `components`: Mutable vector to push components into
+    ///
+    /// Components can hold references to the configuration.
+    ///
+    /// # Example
+    /// ```ignore
+    /// let config = load_config();
+    /// Registry::new(&config, |config, components| {
+    ///     components.push(Box::new(DatabaseComponent::new(config)));
+    ///     components.push(Box::new(HttpServerComponent::new(config)));
+    /// })
+    /// .run()
+    /// .await;
+    /// ```
+    pub fn new<F>(config: &'a C, register_fn: F) -> Self
+    where
+        F: FnOnce(&'a C, &mut Vec<Box<dyn Component + 'a>>),
+    {
         let (shutdown_tx, _) = broadcast::channel(1);
+        let mut components = Vec::new();
+
+        register_fn(config, &mut components);
+
         Self {
-            components: Vec::new(),
+            config,
+            components,
             handles: Vec::new(),
             shutdown_tx,
         }
     }
 
-    /// Register a component
-    pub fn register(&mut self, component: Box<dyn Component>) {
-        self.components.push(component);
-    }
-
-    /// Startup all components in registration order (STRICT MODE)
+    /// Run the application: startup all components, wait for shutdown, then cleanup
     ///
-    /// In strict mode, if any component fails to start or panics:
-    /// 1. All previously started components are gracefully shut down
-    /// 2. Returns an error
+    /// This method:
+    /// 1. Starts all components in registration order
+    /// 2. Waits for shutdown signal (Ctrl+C or SIGTERM)
+    /// 3. Gracefully shuts down all components in reverse order
     ///
-    /// This ensures that dependencies are properly satisfied and resources are not leaked.
-    pub async fn startup_all(&mut self) -> Result<(), Error> {
+    /// If any component fails to start:
+    /// - All previously started components are gracefully shut down
+    /// - Process exits with error code 1
+    ///
+    /// # Example
+    /// ```ignore
+    /// Registry::new(config, register_components)
+    ///     .run()
+    ///     .await;
+    /// ```
+    pub async fn run(mut self) {
+        // Startup all components
         let mut started_count = 0;
 
         for (idx, c) in self.components.iter_mut().enumerate() {
@@ -78,17 +117,13 @@ impl Registry {
                 Err(e) => {
                     self.shutdown_all().await;
                     log::error!("Component {} failed to start: {}", idx, e);
-                    return Err(e);
+                    std::process::exit(1);
                 }
             }
         }
 
         log::info!("All {} components started successfully", started_count);
-        Ok(())
-    }
 
-    /// Wait for shutdown signal, then gracefully shutdown all components
-    pub async fn wait_for_shutdown(&mut self) {
         // Wait for shutdown signal
         wait_for_signal().await;
 
