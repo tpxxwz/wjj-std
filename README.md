@@ -2,7 +2,7 @@
 
 > WJJ's Standard Library for Rust - A comprehensive toolkit for building robust applications
 
-[![Rust](https://img.shields.io/badge/rust-1.91.1%2B-orange.svg)](https://www.rust-lang.org/)
+[![Rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
 
 ## 📖 Overview
@@ -19,6 +19,10 @@
   - Distributed slice registration for error codes
   - Two error types: `FmtErr` (template-based) and `RawErr` (fixed message)
   - Full integration with standard `Error` trait
+- **🚀 Application Framework**
+  - Component lifecycle management
+  - Async startup hooks
+  - Graceful shutdown via broadcast signals
 
 ### Coming Soon
 
@@ -40,6 +44,7 @@ wjj-std = { version = "0.0.1", features = ["error"] }
 
 **Available Features:**
 - `error` - Error handling with template-based messages
+- `app` - Component-based application framework
 - `string` - String utilities (coming soon)
 - `http` - HTTP utilities (coming soon)
 - `json` - JSON utilities (coming soon)
@@ -141,12 +146,13 @@ pub enum UserErrors {
 
 ```toml
 [dependencies]
-wjj-std = { version = "0.1", features = ["full"] }
+wjj-std = { version = "0.0.1", features = ["full"] }
 ```
 
 Available features:
 
-- `error` (default) - Error handling functionality
+- `error` - Error handling functionality
+- `app` - Component-based application framework
 - `string` - String utilities (coming soon)
 - `http` - HTTP utilities (coming soon)
 - `json` - JSON utilities (coming soon)

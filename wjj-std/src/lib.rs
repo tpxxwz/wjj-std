@@ -16,6 +16,8 @@
 //! ### Error Handling
 //!
 //! ```rust
+//! # #[cfg(feature = "error")]
+//! # {
 //! use wjj_std::{fmt_err, raw_err, FmtErr, RawErr};
 //! use serde_json::json;
 //!
@@ -52,6 +54,7 @@
 //!     let err = SystemErrors::DbConnectionFailed.to_err();
 //!     println!("Error: {}", err);  // Error: Database connection failed
 //! }
+//! # }
 //! ```
 //!
 //! ## Architecture
@@ -63,7 +66,8 @@
 //!
 //! ## Feature Flags
 //!
-//! - `error` (default): Error handling functionality
+//! - `error`: Error handling functionality
+//! - `app`: Component-based application framework
 //! - `string`: String utilities (coming soon)
 //! - `http`: HTTP utilities (coming soon)
 //! - `json`: JSON utilities (coming soon)
@@ -78,7 +82,7 @@
 //!
 //! Example: `00100001` = Module `001`, Error `00001`
 
-#![doc(html_root_url = "https://docs.rs/wjj-std/0.1.0")]
+#![doc(html_root_url = "https://docs.rs/wjj-std/0.0.1")]
 #![deny(missing_docs)]
 
 // 为了让宏生成的代码能找到 ::wjj_std:: 路径
@@ -88,36 +92,38 @@ extern crate self as wjj_std;
 #[cfg(feature = "error")]
 mod error;
 #[cfg(feature = "error")]
-pub use error::*;
+#[doc(hidden)]
+pub use error::__private;
+#[cfg(feature = "error")]
+pub use error::{BaseFmtErrs, BaseRawErrs, FmtErr, RawErr, fmt_err, raw_err};
 
 // ========== Feature: app ==========
 #[cfg(feature = "app")]
 pub use wjj_std_core::app::*;
 
+// ========== Feature: template ==========
+#[cfg(feature = "template")]
+mod template;
+
+#[cfg(feature = "template")]
+pub use template::render_template;
+
 // ========== Feature: string ==========
-#[cfg(feature = "string")]
 /// String utilities module (coming soon)
-pub mod string {
-    //! String manipulation utilities
-}
+#[cfg(feature = "string")]
+pub mod string {}
 
 // ========== Feature: http ==========
-#[cfg(feature = "http")]
 /// HTTP utilities module (coming soon)
-pub mod http {
-    //! HTTP client and server utilities
-}
+#[cfg(feature = "http")]
+pub mod http {}
 
 // ========== Feature: json ==========
-#[cfg(feature = "json")]
 /// JSON utilities module (coming soon)
-pub mod json {
-    //! JSON processing utilities
-}
+#[cfg(feature = "json")]
+pub mod json {}
 
 // ========== Feature: time ==========
-#[cfg(feature = "time")]
 /// Time utilities module (coming soon)
-pub mod time {
-    //! Time and date utilities
-}
+#[cfg(feature = "time")]
+pub mod time {}

@@ -27,7 +27,8 @@ async-trait = { workspace = true, optional = true }
 default = []  # 用户明确选择需要的功能
 
 # 功能模块（传递给 core）
-error = ["wjj-std-core/error", "dep:serde_json", "dep:linkme"]  # 错误处理模块（当前已实现）
+template = ["wjj-std-core/template", "dep:serde_json"]          # 模板渲染工具
+error = ["template", "wjj-std-core/error", "dep:linkme"]        # 错误处理模块（依赖 template）
 app = ["wjj-std-core/app", "dep:tokio", "dep:async-trait"]      # 应用框架模块（当前已实现）
 string = ["wjj-std-core/string"]                                # 字符串工具（预留）
 http = ["wjj-std-core/http"]                                    # HTTP 工具（预留）
@@ -35,4 +36,7 @@ json = ["wjj-std-core/json"]                                    # JSON 工具（
 time = ["wjj-std-core/time"]                                    # 时间工具（预留）
 
 # 全功能
-full = ["error", "app", "string", "http", "json", "time"]
+full = ["template", "error", "app", "string", "http", "json", "time"]
+
+[dev-dependencies]
+trybuild.workspace = true

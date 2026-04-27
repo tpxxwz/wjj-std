@@ -1,11 +1,13 @@
 //! Error handling module
 
-pub use wjj_std_core::{
-    ERR_CODE_REGISTRATIONS, ErrCodeRegistration, FmtErr, RawErr, TEMPLATE_REGISTRATIONS,
-    TemplateRegistration,
-};
+pub use wjj_std_core::{FmtErr, RawErr};
 
 pub use wjj_std_macros::{fmt_err, raw_err};
+
+#[doc(hidden)]
+pub mod __private {
+    pub use wjj_std_core::{ERR_REGISTRATIONS, ErrRegistration, ErrRegistrationKind};
+}
 
 /// Base raw error types for system-level errors
 #[derive(raw_err)]

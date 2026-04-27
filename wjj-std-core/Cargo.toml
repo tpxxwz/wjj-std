@@ -14,8 +14,11 @@ crate-type = ["rlib"]
 [features]
 default = []
 
+# Template rendering helpers
+template = ["dep:minijinja", "dep:parking_lot", "dep:serde_json"]
+
 # Error handling module
-error = ["dep:linkme", "dep:ctor", "dep:minijinja", "dep:once_cell", "dep:serde_json"]
+error = ["template", "dep:linkme", "dep:ctor"]
 
 # Application framework module
 app = ["dep:tokio", "dep:async-trait", "dep:log"]
@@ -27,14 +30,14 @@ json = []
 time = []
 
 # All features
-full = ["error", "app", "string", "http", "json", "time"]
+full = ["template", "error", "app", "string", "http", "json", "time"]
 
 [dependencies]
 # Optional dependencies for error feature
 linkme = { workspace = true, optional = true }
 ctor = { workspace = true, optional = true }
 minijinja = { workspace = true, optional = true }
-once_cell = { workspace = true, optional = true }
+parking_lot = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 
 # Optional dependencies for app feature
