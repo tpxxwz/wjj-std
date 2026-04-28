@@ -3,7 +3,7 @@
 mod template;
 
 #[cfg(feature = "template")]
-pub use template::format_template;
+pub use template::{format_positional, format_template_cached, format_template_once};
 
 // ========== Feature: error ==========
 #[cfg(feature = "error")]
