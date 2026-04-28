@@ -93,7 +93,7 @@ extern crate self as wjj_std;
 mod template;
 
 #[cfg(feature = "template")]
-pub use template::format_named_template;
+pub use template::format_template;
 
 // ========== Feature: error ==========
 #[cfg(feature = "error")]

@@ -1,55 +1,74 @@
 use lru::LruCache;
-use minijinja::{Environment, Error, ErrorKind, UndefinedBehavior};
-use parking_lot::Mutex;
+use minijinja::{Environment, Error, UndefinedBehavior};
+use parking_lot::RwLock;
 use std::num::NonZeroUsize;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::LazyLock;
 
 const REGISTERED_TEMPLATE_CAPACITY: usize = 1024;
 
-struct TemplateEngine {
-    env: Environment<'static>,
-    sources: LruCache<String, String>,
+static TEMPLATE_ID: AtomicU64 = AtomicU64::new(0);
+
+fn next_template_id() -> String {
+    format!("__t{}", TEMPLATE_ID.fetch_add(1, Ordering::Relaxed))
 }
 
-static TEMPLATES: LazyLock<Mutex<TemplateEngine>> = LazyLock::new(|| {
+struct TemplateEngine {
+    env: Environment<'static>,
+    // key: source string, value: internal name in env
+    registered: LruCache<String, String>,
+}
+
+static TEMPLATES: LazyLock<RwLock<TemplateEngine>> = LazyLock::new(|| {
     let mut env = Environment::new();
     env.set_undefined_behavior(UndefinedBehavior::Strict);
 
-    Mutex::new(TemplateEngine {
+    RwLock::new(TemplateEngine {
         env,
-        sources: LruCache::new(
+        registered: LruCache::new(
             NonZeroUsize::new(REGISTERED_TEMPLATE_CAPACITY)
                 .expect("registered template capacity must be non-zero"),
         ),
     })
 });
 
-pub fn format_named_template(
-    name: &str,
-    source: &str,
-    args: serde_json::Value,
-) -> Result<String, Error> {
-    let mut engine = TEMPLATES.lock();
-
-    match engine.sources.get(name) {
-        Some(existing_source) if *existing_source != source => Err(template_conflict_error(name)),
-        Some(_) => engine.env.get_template(name)?.render(args),
-        None => {
-            engine
-                .env
-                .add_template_owned(name.to_owned(), source.to_owned())?;
-            if let Some((evicted_name, _)) = engine.sources.push(name.to_owned(), source.to_owned())
-            {
-                engine.env.remove_template(&evicted_name);
-            }
-            engine.env.get_template(name)?.render(args)
-        }
-    }
+pub fn format_template_once(source: &str, args: serde_json::Value) -> Result<String, Error> {
+    TEMPLATES.read().env.render_str(source, args)
 }
 
-fn template_conflict_error(name: &str) -> Error {
-    Error::new(
-        ErrorKind::InvalidOperation,
-        format!("template `{name}` already registered with different source"),
-    )
+pub fn format_template_cached(source: &str, args: serde_json::Value) -> Result<String, Error> {
+    if let Some(result) = try_render_from_cache(source, &args) {
+        return result;
+    }
+    let name = ensure_template_registered(source)?;
+    TEMPLATES.read().env.get_template(&name)?.render(args)
+}
+
+fn ensure_template_registered(source: &str) -> Result<String, Error> {
+    let mut engine = TEMPLATES.write();
+    if let Some(name) = engine.registered.get(source) {
+        return Ok(name.clone());
+    }
+    let name = next_template_id();
+    engine.env.add_template_owned(name.clone(), source.to_owned())?;
+    if let Some((_, evicted_name)) = engine.registered.push(source.to_owned(), name.clone()) {
+        engine.env.remove_template(&evicted_name);
+    }
+    Ok(name)
+}
+
+fn try_render_from_cache(
+    source: &str,
+    args: &serde_json::Value,
+) -> Option<Result<String, Error>> {
+    let engine = TEMPLATES.read();
+    if let Some(name) = engine.registered.peek(source) {
+        return Some(
+            engine
+                .env
+                .get_template(name)
+                .and_then(|t| t.render(args.clone())),
+        );
+    }
+    None
 }
