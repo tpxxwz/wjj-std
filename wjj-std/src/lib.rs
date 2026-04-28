@@ -88,6 +88,13 @@
 // 为了让宏生成的代码能找到 ::wjj_std:: 路径
 extern crate self as wjj_std;
 
+// ========== Feature: template ==========
+#[cfg(feature = "template")]
+mod template;
+
+#[cfg(feature = "template")]
+pub use template::format_named_template;
+
 // ========== Feature: error ==========
 #[cfg(feature = "error")]
 mod error;
@@ -100,13 +107,6 @@ pub use error::{BaseFmtErrs, BaseRawErrs, FmtErr, RawErr, fmt_err, raw_err};
 // ========== Feature: app ==========
 #[cfg(feature = "app")]
 pub use wjj_std_core::app::*;
-
-// ========== Feature: template ==========
-#[cfg(feature = "template")]
-mod template;
-
-#[cfg(feature = "template")]
-pub use template::render_template;
 
 // ========== Feature: string ==========
 /// String utilities module (coming soon)

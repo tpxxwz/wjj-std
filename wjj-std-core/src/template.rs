@@ -1,73 +1,49 @@
+use lru::LruCache;
 use minijinja::{Environment, Error, ErrorKind, UndefinedBehavior};
-use parking_lot::RwLock;
-use std::collections::HashMap;
+use parking_lot::Mutex;
+use std::num::NonZeroUsize;
 use std::sync::LazyLock;
 
-struct TemplateRegistry {
+const REGISTERED_TEMPLATE_CAPACITY: usize = 1024;
+
+struct TemplateEngine {
     env: Environment<'static>,
-    sources: HashMap<&'static str, &'static str>,
+    sources: LruCache<String, String>,
 }
 
-static TEMPLATES: LazyLock<RwLock<TemplateRegistry>> = LazyLock::new(|| {
+static TEMPLATES: LazyLock<Mutex<TemplateEngine>> = LazyLock::new(|| {
     let mut env = Environment::new();
     env.set_undefined_behavior(UndefinedBehavior::Strict);
 
-    RwLock::new(TemplateRegistry {
+    Mutex::new(TemplateEngine {
         env,
-        sources: HashMap::new(),
+        sources: LruCache::new(
+            NonZeroUsize::new(REGISTERED_TEMPLATE_CAPACITY)
+                .expect("registered template capacity must be non-zero"),
+        ),
     })
 });
 
-pub fn render_template(
-    name: &'static str,
-    source: &'static str,
+pub fn format_named_template(
+    name: &str,
+    source: &str,
     args: serde_json::Value,
 ) -> Result<String, Error> {
-    if let Some(output) = render_registered_template(name, source, args.clone())? {
-        return Ok(output);
-    }
+    let mut engine = TEMPLATES.lock();
 
-    let mut registry = TEMPLATES.write();
-    register_template_locked(&mut registry, name, source)?;
-
-    registry.env.get_template(name)?.render(args)
-}
-
-#[allow(dead_code)]
-pub(crate) fn register_template(name: &'static str, source: &'static str) -> Result<(), Error> {
-    let mut registry = TEMPLATES.write();
-    register_template_locked(&mut registry, name, source)
-}
-
-fn register_template_locked(
-    registry: &mut TemplateRegistry,
-    name: &'static str,
-    source: &'static str,
-) -> Result<(), Error> {
-    match registry.sources.get(name) {
+    match engine.sources.get(name) {
         Some(existing_source) if *existing_source != source => Err(template_conflict_error(name)),
-        Some(_) => Ok(()),
+        Some(_) => engine.env.get_template(name)?.render(args),
         None => {
-            registry.env.add_template(name, source)?;
-            registry.sources.insert(name, source);
-            Ok(())
+            engine
+                .env
+                .add_template_owned(name.to_owned(), source.to_owned())?;
+            if let Some((evicted_name, _)) = engine.sources.push(name.to_owned(), source.to_owned())
+            {
+                engine.env.remove_template(&evicted_name);
+            }
+            engine.env.get_template(name)?.render(args)
         }
-    }
-}
-
-fn render_registered_template(
-    name: &'static str,
-    source: &'static str,
-    args: serde_json::Value,
-) -> Result<Option<String>, Error> {
-    let registry = TEMPLATES.read();
-
-    match registry.sources.get(name) {
-        Some(existing_source) if *existing_source == source => {
-            Ok(Some(registry.env.get_template(name)?.render(args)?))
-        }
-        Some(_) => Err(template_conflict_error(name)),
-        None => Ok(None),
     }
 }
 
